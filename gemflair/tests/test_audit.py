@@ -2,6 +2,7 @@ import datetime as dt
 import json
 
 import polars as pl
+import yaml
 
 from gemflair import audit, winnow
 
@@ -67,6 +68,24 @@ def test_unk_rate_is_reported():
     assert next(r for r in res if r["check"] == "unk_rate")["detail"].endswith("UNK")
 
 
+def test_no_future_data_fails_when_n_past_is_undercounted():
+    frame = winnow.cut(TOKENS, winnow.cut_points([COHORT]), max_len=10)
+    tampered = frame.with_columns(
+        n_past=pl.when(pl.col("feature_cutoff_dttm") == AT(4))
+        .then(pl.col("n_past") - 1).otherwise(pl.col("n_past")))
+    res = audit.after_winnow(tampered, TOKENS, {"t": COHORT}, max_len=10)
+    assert not _ok(res, "no_future_data")
+
+
+def test_length_check_fails_when_tokens_exceed_max_len():
+    frame = winnow.cut(TOKENS, winnow.cut_points([COHORT]), max_len=10)
+    tampered = frame.with_columns(
+        tokens_past=pl.lit(list(range(15))),
+        s_elapsed_past=pl.lit([float(i) for i in range(15)]))
+    res = audit.after_winnow(tampered, TOKENS, {"t": COHORT}, max_len=10)
+    assert not _ok(res, "token_elapsed_lengths_match")
+
+
 def test_after_extract_fails_on_multiple_feature_files():
     idx = pl.DataFrame({"row_ix": [0, 1]})
     feats = pl.DataFrame({"features": [[0.0], [0.0]]})
@@ -85,3 +104,61 @@ def test_save_returns_false_and_writes_json(tmp_path):
     out = tmp_path / "a.json"
     assert audit.save([{"check": "x", "ok": False, "detail": "d"}], out) is False
     assert json.loads(out.read_text())[0]["check"] == "x"
+
+
+def test_save_returns_true_when_all_pass(tmp_path):
+    out = tmp_path / "b.json"
+    assert audit.save([{"check": "x", "ok": True, "detail": "d"}], out) is True
+
+
+def _startup_cfg(tmp_path, *, vocab_size=5, max_pos=100, max_len=10, bos=0, eos=1,
+                  tkzr_bos=0, tkzr_eos=1, clif_tz="US/Eastern", collation_tz="US/Eastern",
+                  lookup_size=5):
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    gen_dir = tmp_path / "work" / "generated"
+    gen_dir.mkdir(parents=True)
+    lookup = {"BOS": tkzr_bos, "EOS": tkzr_eos}
+    i = 0
+    while len(lookup) < lookup_size:
+        lookup.setdefault(f"t{i}", i + 2)
+        i += 1
+    (model_dir / "config.json").write_text(
+        json.dumps({"vocab_size": vocab_size, "max_position_embeddings": max_pos}))
+    (model_dir / "generation_config.json").write_text(
+        json.dumps({"bos_token_id": bos, "eos_token_id": eos}))
+    (model_dir / "tokenizer.yaml").write_text(yaml.safe_dump({"lookup": lookup}))
+    (gen_dir / "clif_config.json").write_text(json.dumps({"timezone": clif_tz}))
+    (gen_dir / "collation.yaml").write_text(yaml.safe_dump({"default_timezone": collation_tz}))
+    return {"work_dir": tmp_path / "work",
+            "model": {"dir": model_dir, "tokenizer": model_dir / "tokenizer.yaml", "max_len": max_len}}
+
+
+def test_startup_passes_when_everything_agrees(tmp_path):
+    cfg = _startup_cfg(tmp_path)
+    res = audit.startup(cfg)
+    assert all(r["ok"] for r in res)
+
+
+def test_startup_fails_on_vocab_size_mismatch(tmp_path):
+    cfg = _startup_cfg(tmp_path, vocab_size=999)
+    res = audit.startup(cfg)
+    assert not _ok(res, "vocab_size_matches_tokenizer")
+
+
+def test_startup_fails_on_bos_eos_mismatch(tmp_path):
+    cfg = _startup_cfg(tmp_path, tkzr_bos=42)
+    res = audit.startup(cfg)
+    assert not _ok(res, "bos_eos_match_tokenizer")
+
+
+def test_startup_fails_when_max_len_exceeds_model(tmp_path):
+    cfg = _startup_cfg(tmp_path, max_len=1000)
+    res = audit.startup(cfg)
+    assert not _ok(res, "max_len_fits_model")
+
+
+def test_startup_fails_on_timezone_mismatch(tmp_path):
+    cfg = _startup_cfg(tmp_path, collation_tz="UTC")
+    res = audit.startup(cfg)
+    assert not _ok(res, "timezones_agree")

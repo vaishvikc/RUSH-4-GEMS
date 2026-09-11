@@ -34,10 +34,12 @@ def startup(cfg):
 
 
 def after_winnow(frame, tokens_times, cohorts, max_len):
-    # Recompute the last kept event time independently of the winnow query.
+    # Bound n_past from both sides: last included <= cutoff, first excluded > cutoff.
     check = (frame.join(tokens_times.select("subject_id", "times"), on="subject_id")
-             .with_columns(last=pl.col("times").list.head("n_past").list.last()))
+             .with_columns(last=pl.col("times").list.head("n_past").list.last(),
+                           nxt=pl.col("times").list.slice(pl.col("n_past"), 1).list.first()))
     leaks = check.filter(pl.col("last") > pl.col("feature_cutoff_dttm")).height
+    undercount = check.filter(pl.col("nxt") <= pl.col("feature_cutoff_dttm")).height
 
     lengths = frame.select(
         bad=(pl.col("tokens_past").list.len() != pl.col("s_elapsed_past").list.len())
@@ -58,7 +60,8 @@ def after_winnow(frame, tokens_times, cohorts, max_len):
     tokens = tokens_times["tokens"].explode()
     unk = (tokens == 0).sum() / max(1, len(tokens))
     return [
-        _r("no_future_data", leaks == 0, f"{leaks} rows past cutoff"),
+        _r("no_future_data", leaks == 0 and undercount == 0,
+           f"{leaks} rows past cutoff, {undercount} undercounted"),
         _r("token_elapsed_lengths_match", lengths == 0, f"{lengths} bad rows"),
         _r("one_row_per_cut_point", dupes == 0, f"{dupes} duplicate cut points"),
         _r("rows_removed", True, f"{len(removed)} removed: {removed[:20]}"),
