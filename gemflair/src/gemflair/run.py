@@ -37,14 +37,13 @@ def load_task(cfg, task, force=False):
     p = config.paths(cfg)
     out = p["cohorts"] / f"{task}.parquet"
     # A cohort takes ~77 minutes to build; skip it on a resumed run.
-    if out.exists() and not force:
-        return out
-    args = ["flair", "load-task", task,
-            "--clif-config", p["generated"] / "clif_config.json", "--out", out]
-    if cfg["split"]["train_end"] and cfg["split"]["test_start"]:
-        args += ["--train-end", cfg["split"]["train_end"],
-                 "--test-start", cfg["split"]["test_start"]]
-    _sh(*args)
+    if not out.exists() or force:
+        args = ["flair", "load-task", task,
+                "--clif-config", p["generated"] / "clif_config.json", "--out", out]
+        if cfg["split"]["train_end"] and cfg["split"]["test_start"]:
+            args += ["--train-end", cfg["split"]["train_end"],
+                     "--test-start", cfg["split"]["test_start"]]
+        _sh(*args)
     trimmed = subsample(pl.read_parquet(out),
                         cfg["limits"]["max_encounters_per_task"], cfg["xgboost"]["seed"])
     trimmed.write_parquet(out)

@@ -87,3 +87,20 @@ def test_write_keeps_both_files_in_the_same_order(tokens_times, tmp_path):
     assert inf.height == idx.height == out.height
     assert idx["row_ix"].to_list() == list(range(out.height))
     assert inf["tokens_past"].to_list() == out["tokens_past"].to_list()
+
+
+def test_write_writes_a_fingerprint_file(tokens_times, tmp_path):
+    out = winnow.cut(tokens_times, _cuts([("a", 2), ("b", 5)]), max_len=10)
+    winnow.write(out, tmp_path)
+    assert (tmp_path / "cut_index.fingerprint").read_text() == winnow.fingerprint(out)
+
+
+def test_fingerprint_is_deterministic_for_identical_content(tokens_times):
+    out = winnow.cut(tokens_times, _cuts([("a", 2), ("b", 5), ("a", 4)]), max_len=10)
+    assert winnow.fingerprint(out) == winnow.fingerprint(out.clone())
+
+
+def test_fingerprint_differs_when_identity_columns_differ(tokens_times):
+    a = winnow.cut(tokens_times, _cuts([("a", 2)]), max_len=10)
+    b = winnow.cut(tokens_times, _cuts([("a", 4)]), max_len=10)
+    assert winnow.fingerprint(a) != winnow.fingerprint(b)

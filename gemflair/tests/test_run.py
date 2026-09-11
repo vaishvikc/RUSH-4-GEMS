@@ -75,8 +75,26 @@ def test_load_task_skips_the_subprocess_when_the_cohort_already_exists(tmp_path,
     work = tmp_path / "work"
     (work / "cohorts").mkdir(parents=True)
     existing = work / "cohorts" / "icu_daily_mortality.parquet"
-    existing.write_text("already built")
+    cohort = _cohort_with_two_multirow_encounters()
+    cohort.write_parquet(existing)
     monkeypatch.setattr(run, "_sh", lambda *a: pytest.fail("flair load-task should not run"))
-    out = run.load_task({"work_dir": work}, "icu_daily_mortality")
+    cfg = {"work_dir": work, "limits": {"max_encounters_per_task": None},
+           "xgboost": {"seed": 42}}
+    out = run.load_task(cfg, "icu_daily_mortality")
     assert out == existing
-    assert existing.read_text() == "already built"
+    assert pl.read_parquet(existing).equals(cohort)
+
+
+def test_load_task_reapplies_the_cap_to_a_cached_cohort_without_the_subprocess(
+        tmp_path, monkeypatch):
+    work = tmp_path / "work"
+    (work / "cohorts").mkdir(parents=True)
+    existing = work / "cohorts" / "icu_daily_mortality.parquet"
+    _cohort().write_parquet(existing)
+    monkeypatch.setattr(run, "_sh", lambda *a: pytest.fail("flair load-task should not run"))
+    cfg = {"work_dir": work, "limits": {"max_encounters_per_task": 1},
+           "xgboost": {"seed": 42}}
+    out = run.load_task(cfg, "icu_daily_mortality")
+    result = pl.read_parquet(out)
+    assert result["hospitalization_join_id"].n_unique() == 2
+    assert set(result["split"].unique()) == {"train", "test"}

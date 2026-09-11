@@ -1,3 +1,5 @@
+import hashlib
+
 import polars as pl
 
 INFERENCE_COLS = ["tokens_past", "s_elapsed_past"]
@@ -38,8 +40,15 @@ def cut(tokens_times, cuts, max_len):
             .select(INDEX_COLS + INFERENCE_COLS))
 
 
+def fingerprint(frame):
+    ident = frame.select("subject_id", "feature_cutoff_dttm")
+    rows = "\n".join(f"{s}|{t}" for s, t in ident.iter_rows())
+    return hashlib.sha256(rows.encode()).hexdigest()
+
+
 def write(frame, processed_dir):
     # "held_out" is cotorra's filename slot, not a statistical split.
     frame.select(INFERENCE_COLS).write_parquet(
         processed_dir / "held_out_for_inference.parquet")
     frame.select(INDEX_COLS).write_parquet(processed_dir / "cut_index.parquet")
+    (processed_dir / "cut_index.fingerprint").write_text(fingerprint(frame))

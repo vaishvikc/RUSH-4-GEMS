@@ -96,14 +96,35 @@ def extract(config_path: str = CONFIG):
     if not audit.save(audit.after_extract(feats, index, len(files)),
                       p["audit"] / "extract.json"):
         raise typer.Exit(1)
+    fp = (p["processed"] / "cut_index.fingerprint").read_text()
+    (p["processed"] / "features.fingerprint").write_text(fp)
+
+
+def _features_stale(p):
+    cut_fp = p["processed"] / "cut_index.fingerprint"
+    feat_fp = p["processed"] / "features.fingerprint"
+    return (not cut_fp.exists() or not feat_fp.exists()
+            or cut_fp.read_text() != feat_fp.read_text())
+
+
+def _features_file(p):
+    files = sorted(p["processed"].glob("features-held_out-*.parquet"))
+    return files[0] if files else None
 
 
 @app.command("fit")
 def fit_cmd(config_path: str = CONFIG):
     from flair_benchmark.tasks import get_task
     cfg, p = _setup(config_path)
+    if _features_stale(p):
+        typer.echo("Features are stale or missing: run `gemflair extract` before `fit`.")
+        raise typer.Exit(1)
+    feats_path = _features_file(p)
+    if feats_path is None:
+        typer.echo("No features file found: run `gemflair extract` before `fit`.")
+        raise typer.Exit(1)
     index = pl.read_parquet(p["processed"] / "cut_index.parquet")
-    feats = pl.read_parquet(next(p["processed"].glob("features-held_out-*.parquet")))
+    feats = pl.read_parquet(feats_path)
     for task, cohort in _cohorts(cfg, p).items():
         label = get_task(task).META["label_column"]
         fit.run(cohort, index, feats, label, cfg).write_parquet(

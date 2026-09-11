@@ -219,6 +219,23 @@ ignores its split values. `verify-rope` does read its `tuning` split, which is w
 `winnow` carves one deterministically out of train (10%, seeded with
 `xgboost.seed`).
 
+### 5.6 `fit` refuses to run against stale features
+
+`winnow` writes a content fingerprint of `cut_index.parquet` (`cut_index.fingerprint`);
+`extract` copies it to `features.fingerprint` after a successful extraction. `fit`
+checks the two fingerprints match before doing anything else and refuses to run
+(naming `gemflair extract` as the fix) if they differ or either is missing — this
+catches a re-run of `winnow` (changed cohort, re-tokenize) after `extract` already
+produced a features file, which would otherwise misalign feature vectors to the
+wrong patients' labels without erroring.
+
+### 5.7 The cohort cache reapplies `max_encounters_per_task` on every run
+
+`run.load_task` skips the `flair load-task` subprocess when the cohort parquet
+already exists, but always re-applies the current `max_encounters_per_task` cap
+afterward — so a cohort cached from a run with no cap (or a different cap) is
+trimmed to the current config's cap rather than silently reused at its cached size.
+
 ## Measured timings
 
 These are the only real numbers we have so far, taken from a **partial pipeline
