@@ -41,6 +41,12 @@ def test_s_elapsed_is_not_rebased_after_trimming(tokens_times):
     assert out["s_elapsed_past"].to_list()[0][0] == 3600.0
 
 
+def test_cut_happens_before_trim(tokens_times):
+    out = winnow.cut(tokens_times, _cuts([("a", 3)]), max_len=2)
+    assert out["tokens_past"].to_list() == [[11, 12]]
+    assert out["s_elapsed_past"].to_list() == [[3600.0, 7200.0]]
+
+
 def test_cutoff_before_first_event_is_dropped(tokens_times):
     out = winnow.cut(tokens_times, _cuts([("b", 0)]), max_len=10)
     assert out.height == 0
