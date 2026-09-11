@@ -371,9 +371,8 @@ Per task, independently:
    `subject_id` **is** the cohort's `hospitalization_id` — cocoa's collation config
    sets `subject_id: hospitalization_id` (§3.1), so the two are the same key under
    two names. The join renames rather than mapping.
-2. Gather `features[row_ix]`, cast float16 → float32. That is **X**. No other
-   columns by default; `include_static_features: true` adds demographics for an
-   ablation.
+2. Gather `features[row_ix]`, cast float16 → float32. That is **X**. The
+   representation is the only input; no demographic or static columns are added.
 3. **y** = the task's `label_column` from its `META`.
 4. Rows with `n_past == 0` are excluded from both training and prediction (§7.3).
 5. Train on `split == "train"`. Hold out 10% of *training encounters*
@@ -383,8 +382,8 @@ Per task, independently:
 7. Write `preds/<task>.parquet` = the cohort rows **unchanged** plus `y_prob`,
    so `prediction_id` cannot drift.
 
-Parameters: fixed sensible defaults plus `early_stopping_rounds`. `n_hpo_trials`
-defaults to 0.
+Parameters: fixed sensible defaults plus `early_stopping_rounds`. No
+hyperparameter search — add one only if the fixed defaults prove inadequate.
 
 ### Stage 7 — `report`
 
@@ -569,9 +568,7 @@ extract:
   device: auto                          # auto | cuda | mps | cpu
 
 xgboost:
-  n_hpo_trials: 0
   early_stopping_rounds: 50
-  include_static_features: false
   seed: 42
 
 limits:
