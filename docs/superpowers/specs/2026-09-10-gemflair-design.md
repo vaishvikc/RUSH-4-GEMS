@@ -56,7 +56,7 @@ Five packages sit in the repo. Their roles:
 | Property | Value | Source |
 |---|---|---|
 | Architecture | `LlamaForCausalLM`, 9 layers, hidden 1024, 8 heads | `config.json` |
-| Parameters | ~76.9M (cotorra preset `llama_32`) | `cotorra/config/training.yaml` |
+| Parameters | ~76.9M (cotorra preset `llama_32`) | `reference/cotorra/config/training.yaml` |
 | Vocab size | 1344 | `config.json` |
 | BOS / EOS | 90 / 125 | `config.json` |
 | `pad_token_id` | absent → set to EOS at load | `extractor.py:52-53` |
@@ -168,7 +168,7 @@ training conditions.
 
 ### 3.6 The collation config requires four derived CLIF tables
 
-`cocoa/config/collation.yaml` reads `clif_medication_admin_continuous_converted`,
+`reference/cocoa/config/collation.yaml` reads `clif_medication_admin_continuous_converted`,
 `clif_medication_admin_intermittent_converted`, `clif_respiratory_support_processed`,
 and `clif_sofa`. None exist in `clif_m/`. They supply
 `MED-CTS`(415) + `MED-INT`(178) + `RESP`(37) + `SOFA`(23) = **653 of 1344 tokens**.
