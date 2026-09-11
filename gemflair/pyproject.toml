@@ -1,0 +1,38 @@
+[project]
+name = "gemflair"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "polars>=1.44",
+    "numpy",
+    "xgboost",
+    "torch",
+    "transformers",
+    "typer",
+    "pyyaml",
+    "pyarrow",
+    "flair-benchmark[viz]",
+    "cocoa-tokenizer",
+    "cotorra",
+    "clifpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+gemflair = "gemflair.cli:main"
+
+# Wheels are vendored so the project runs without the reference clones.
+# Rebuild with: uv build --wheel --out-dir gemflair/wheels <path-to-repo>
+[tool.uv.sources]
+flair-benchmark = { path = "wheels/flair_benchmark-0.0.1-py3-none-any.whl" }
+cocoa-tokenizer = { path = "wheels/cocoa_tokenizer-26.6.3-py3-none-any.whl" }
+cotorra = { path = "wheels/cotorra-26.6.3-py3-none-any.whl" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gemflair"]

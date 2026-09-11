@@ -1,0 +1,36 @@
+# Relative paths resolve against the current working directory.
+data:
+  clif_dir: /Users/sudo_sage/Downloads/work/clif_m
+  derived_dir: ./work/clif_derived
+  timezone: US/Eastern
+  site: mimic
+
+model:
+  dir: ./GEM-weights-FL-manuscript/GEM-mimic-icu/mdl-cotorra
+  tokenizer: ./GEM-weights-FL-manuscript/tokenizer.yaml
+  trainer_state: ./GEM-weights-FL-manuscript/GEM_-mimic-icu/mdl-cotorra/trainer_state.json
+  max_len: 4096
+  time_based_rope:
+    sec_per_pos_id: 300
+
+tasks:
+  - icu_daily_mortality
+  - icu_daily_ltach
+  - extubation_failure_24h
+  - icu_readmission
+
+split:
+  train_end: null
+  test_start: null
+
+extract:
+  batch_size: 64
+
+xgboost:
+  early_stopping_rounds: 50
+  seed: 42
+
+limits:
+  max_encounters_per_task: null
+
+work_dir: ./work
