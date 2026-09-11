@@ -91,7 +91,7 @@ Vocabulary by prefix:
 
 Loaded with `Tokenizer.from_yaml(..., done_training=True)`, which sets
 `is_training=False` and freezes both the lookup and the bin cutpoints
-(`cocoa/tokenizer.py:337-364`). Any code or value not in the frozen vocabulary
+(`reference/cocoa/src/cocoa/tokenizer.py:337-364`). Any code or value not in the frozen vocabulary
 maps to `UNK` (token 0).
 
 ---
@@ -398,7 +398,7 @@ Report mode comes from the task's `META`, so it is not passed.
 
 ## 7. The cohort winnower
 
-The only genuinely new logic. Modeled on `cocoa/winnower.py`, but the cut point
+The only genuinely new logic. Modeled on `reference/cocoa/src/cocoa/winnower.py`, but the cut point
 comes from data rather than config.
 
 ### 7.1 Input
