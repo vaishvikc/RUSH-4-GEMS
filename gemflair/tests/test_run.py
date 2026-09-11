@@ -15,6 +15,7 @@ def test_raw_view_symlinks_both_directories(tmp_path):
     view = run.raw_view(cfg)
     assert {p.name for p in view.iterdir()} == {"clif_labs.parquet", "clif_sofa.parquet"}
     assert (view / "clif_labs.parquet").is_symlink()
+    assert (view / "clif_sofa.parquet").is_symlink()
 
 
 def test_raw_view_lets_derived_shadow_raw(tmp_path):
@@ -38,14 +39,24 @@ def _cohort():
 
 def test_subsample_none_returns_everything():
     c = _cohort()
-    assert run.subsample(c, None, seed=42).height == c.height
+    assert run.subsample(c, None, seed=42).equals(c)
+
+
+def _cohort_with_two_multirow_encounters():
+    return pl.DataFrame({
+        "hospitalization_join_id": ["e1", "e1", "e2", "e2", "e3", "e4"],
+        "split": ["train", "train", "train", "train", "test", "test"],
+        "feature_cutoff_dttm": [dt.datetime(2020, 1, 1)] * 6,
+    })
 
 
 def test_subsample_keeps_whole_encounters():
-    out = run.subsample(_cohort(), n=1, seed=42)
+    cohort = _cohort_with_two_multirow_encounters()
+    out = run.subsample(cohort, n=1, seed=42)
     for enc in out["hospitalization_join_id"].unique():
-        original = _cohort().filter(pl.col("hospitalization_join_id") == enc).height
+        original = cohort.filter(pl.col("hospitalization_join_id") == enc).height
         assert out.filter(pl.col("hospitalization_join_id") == enc).height == original
+    assert out.filter(pl.col("hospitalization_join_id") == "e2").height == 2
 
 
 def test_subsample_keeps_both_splits():
