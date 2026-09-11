@@ -24,9 +24,14 @@ def test_missing_table_error_names_the_token_prefixes():
     assert "SOFA" in str(e.value)
 
 
-def test_check_rejects_an_empty_frame():
-    with pytest.raises(RuntimeError, match="SOFA"):
-        prep.check(pl.DataFrame(), "clif_sofa")
+def test_check_rejects_a_schema_valid_frame_with_no_rows():
+    time_col, cols = prep.REQUIRED["clif_sofa"]
+    schema = {time_col: pl.Datetime, "hospitalization_id": pl.String}
+    schema.update({c: pl.Int32 for c in cols if c not in schema})
+    frame = pl.DataFrame(schema=schema)
+    assert set(frame.columns) == set([time_col] + cols) and frame.is_empty()
+    with pytest.raises(RuntimeError, match="no rows"):
+        prep.check(frame, "clif_sofa")
 
 
 def test_check_rejects_a_frame_whose_time_column_was_renamed():
