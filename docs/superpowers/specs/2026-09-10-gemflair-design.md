@@ -410,19 +410,35 @@ comes from data rather than config.
 ### 7.2 Algorithm
 
 ```python
-(tokens_times
-  .join(cuts, on="subject_id")                      # 1:many — one row per cut point
-  .with_columns(
-      n_past = pl.col("times").list.eval(
-          pl.element() <= pl.col("feature_cutoff_dttm")).list.sum())
-  .with_columns(
-      tokens_past = pl.col("tokens").list.head("n_past").list.tail(max_len),
-      s_elapsed_past = pl.col("times").list.eval(
-          (pl.element() - pl.element().first()).dt.total_seconds()
-      ).list.head("n_past").list.tail(max_len),
-      n_kept = pl.min_horizontal("n_past", max_len),
-  ))
+def count_past(tokens_times, cuts):
+    # join_asof finds the last event at or before the cutoff; its index + 1 is the count.
+    events = (tokens_times.select("subject_id", "times").explode("times")
+              .with_columns(ix=pl.int_range(pl.len()).over("subject_id")))
+    return (cuts.sort("feature_cutoff_dttm")
+            .join_asof(events.sort("times"), left_on="feature_cutoff_dttm",
+                       right_on="times", by="subject_id", strategy="backward")
+            .with_columns(n_past=(pl.col("ix") + 1).fill_null(0))
+            .select("subject_id", "feature_cutoff_dttm", "n_past"))
+
+
+def cut(tokens_times, cuts, max_len):
+    n = count_past(tokens_times, cuts)
+    return (tokens_times.join(n, on="subject_id")
+            .filter(pl.col("n_past") > 0)
+            .with_columns(
+                tokens_past=pl.col("tokens").list.head("n_past").list.tail(max_len),
+                s_elapsed_past=pl.col("times").list.eval(
+                    (pl.element() - pl.element().first()).dt.total_seconds()
+                ).list.head("n_past").list.tail(max_len))
+            .with_columns(n_kept=pl.col("tokens_past").list.len())
+            .sort("subject_id", "feature_cutoff_dttm")
+            .with_row_index("row_ix")
+            .select(INDEX_COLS + INFERENCE_COLS))
 ```
+
+`list.eval` cannot reference outer columns (`ComputeError: named columns are not allowed in
+eval functions`), so the cutoff comparison uses `join_asof` on an exploded event index
+instead. The list slicing that follows is unchanged.
 
 Three deliberate properties:
 
