@@ -6,9 +6,9 @@ data:
   site: mimic
 
 model:
-  dir: ./GEM-weights-FL-manuscript/GEM-mimic-icu/mdl-cotorra
-  tokenizer: ./GEM-weights-FL-manuscript/tokenizer.yaml
-  trainer_state: ./GEM-weights-FL-manuscript/GEM_-mimic-icu/mdl-cotorra/trainer_state.json
+  dir: ../GEM-weights-FL-manuscript/GEM-mimic-icu/mdl-cotorra
+  tokenizer: ../GEM-weights-FL-manuscript/tokenizer.yaml
+  trainer_state: ../GEM-weights-FL-manuscript/GEM_-mimic-icu/mdl-cotorra/trainer_state.json
   max_len: 4096
   time_based_rope:
     sec_per_pos_id: 300

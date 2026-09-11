@@ -1,6 +1,7 @@
 import datetime as dt
 
 import polars as pl
+import pytest
 
 from gemflair import run
 
@@ -68,3 +69,14 @@ def test_subsample_is_reproducible():
     a = run.subsample(_cohort(), n=1, seed=7)
     b = run.subsample(_cohort(), n=1, seed=7)
     assert a.equals(b)
+
+
+def test_load_task_skips_the_subprocess_when_the_cohort_already_exists(tmp_path, monkeypatch):
+    work = tmp_path / "work"
+    (work / "cohorts").mkdir(parents=True)
+    existing = work / "cohorts" / "icu_daily_mortality.parquet"
+    existing.write_text("already built")
+    monkeypatch.setattr(run, "_sh", lambda *a: pytest.fail("flair load-task should not run"))
+    out = run.load_task({"work_dir": work}, "icu_daily_mortality")
+    assert out == existing
+    assert existing.read_text() == "already built"

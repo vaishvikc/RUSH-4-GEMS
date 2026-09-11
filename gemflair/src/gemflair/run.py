@@ -33,9 +33,12 @@ def subsample(cohort, n, seed):
     return cohort.filter(pl.col("hospitalization_join_id").is_in(keep))
 
 
-def load_task(cfg, task):
+def load_task(cfg, task, force=False):
     p = config.paths(cfg)
     out = p["cohorts"] / f"{task}.parquet"
+    # A cohort takes ~77 minutes to build; skip it on a resumed run.
+    if out.exists() and not force:
+        return out
     args = ["flair", "load-task", task,
             "--clif-config", p["generated"] / "clif_config.json", "--out", out]
     if cfg["split"]["train_end"] and cfg["split"]["test_start"]:
