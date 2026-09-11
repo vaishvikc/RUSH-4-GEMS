@@ -8,6 +8,24 @@ TABLES = {
     "clif_sofa": "SOFA",
 }
 
+REQUIRED = {
+    "clif_medication_admin_continuous_converted": (
+        "admin_dttm",
+        ["hospitalization_id", "med_category", "med_dose_converted", "_convert_status"]),
+    "clif_medication_admin_intermittent_converted": (
+        "admin_dttm",
+        ["hospitalization_id", "med_category", "med_dose_converted", "_convert_status",
+         "mar_action_category"]),
+    "clif_respiratory_support_processed": (
+        "recorded_dttm",
+        ["hospitalization_id", "device_category", "mode_category", "fio2_set",
+         "peep_set", "tidal_volume_set"]),
+    "clif_sofa": (
+        "event_time",
+        ["hospitalization_id", "sofa_cv_97", "sofa_cns", "sofa_coag", "sofa_liver",
+         "sofa_renal", "sofa_resp", "sofa_total"]),
+}
+
 # These dose targets are the units GEM's tokenizer binned against; changing one
 # silently reassigns that medication's quantile tokens.
 CONTINUOUS_UNITS = {
@@ -136,9 +154,20 @@ INTERMITTENT_UNITS = {
 }
 
 
-def fail_missing(name):
+def fail_missing(name, reason="clifpy did not produce it"):
     raise RuntimeError(
-        f"clifpy could not build {name}; tokens prefixed {TABLES[name]}// will be lost")
+        f"{name} unusable: {reason}; tokens prefixed {TABLES[name]}// will be lost")
+
+
+def check(frame, name):
+    time_col, cols = REQUIRED[name]
+    if frame is None or frame.is_empty():
+        fail_missing(name, "no rows")
+    absent = [c for c in [time_col] + cols if c not in frame.columns]
+    if absent:
+        fail_missing(name, f"collation.yaml reads columns that are absent: {absent}")
+    if frame[time_col].null_count():
+        fail_missing(name, f"{time_col} has nulls")
 
 
 def build(cfg, force=False):
@@ -154,8 +183,7 @@ def build(cfg, force=False):
             written.append(path)
             continue
         frame = _build_one(co, name)
-        if frame is None:
-            fail_missing(name)
+        check(frame, name)
         frame.write_parquet(path)
         written.append(path)
     return written

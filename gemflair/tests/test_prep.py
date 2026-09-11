@@ -1,6 +1,12 @@
+import pathlib
+
+import clifpy
+import polars as pl
 import pytest
 
 from gemflair import prep
+
+DEMO = pathlib.Path(clifpy.__file__).parent / "data" / "clif_demo"
 
 
 def test_tables_cover_the_collation_requirements():
@@ -16,3 +22,30 @@ def test_missing_table_error_names_the_token_prefixes():
     with pytest.raises(RuntimeError) as e:
         prep.fail_missing("clif_sofa")
     assert "SOFA" in str(e.value)
+
+
+def test_check_rejects_an_empty_frame():
+    with pytest.raises(RuntimeError, match="SOFA"):
+        prep.check(pl.DataFrame(), "clif_sofa")
+
+
+def test_check_rejects_a_frame_whose_time_column_was_renamed():
+    frame = pl.DataFrame({c: [0] for c in ["recorded_dttm"] + prep.REQUIRED["clif_sofa"][1]})
+    with pytest.raises(RuntimeError, match="event_time"):
+        prep.check(frame, "clif_sofa")
+
+
+def test_check_rejects_nulls_in_the_time_column():
+    time_col, cols = prep.REQUIRED["clif_respiratory_support_processed"]
+    frame = pl.DataFrame({c: [None] if c == time_col else [0] for c in [time_col] + cols})
+    with pytest.raises(RuntimeError, match="RESP"):
+        prep.check(frame, "clif_respiratory_support_processed")
+
+
+def test_build_on_clifpy_demo_data_matches_the_collation_columns(tmp_path):
+    cfg = {"data": {"clif_dir": DEMO, "derived_dir": tmp_path, "timezone": "UTC"}}
+    for path in prep.build(cfg):
+        time_col, cols = prep.REQUIRED[path.stem]
+        frame = pl.read_parquet(path)
+        assert not frame.is_empty()
+        assert set([time_col] + cols) <= set(frame.columns)
