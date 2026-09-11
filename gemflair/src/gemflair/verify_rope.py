@@ -15,6 +15,8 @@ def blocks(rows, seq_len):
 
 
 def eval_loss(model, tok_blocks, elapsed_blocks, sec_per_pos_id, device, batch_size=4):
+    if len(tok_blocks) == 0:
+        raise ValueError("no blocks to evaluate - check for an empty tuning split")
     losses = []
     for i in range(0, len(tok_blocks), batch_size):
         ids = torch.tensor(tok_blocks[i:i + batch_size], device=device)
