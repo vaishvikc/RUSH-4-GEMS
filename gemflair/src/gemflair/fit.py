@@ -4,6 +4,9 @@ import xgboost as xgb
 
 
 def attach(cohort, index, features):
+    cutoff_dtype = index.schema["feature_cutoff_dttm"]
+    cohort = cohort.with_columns(
+        pl.col("feature_cutoff_dttm").dt.cast_time_unit(cutoff_dtype.time_unit))
     df = cohort.join(index, left_on=["hospitalization_id", "feature_cutoff_dttm"],
                      right_on=["subject_id", "feature_cutoff_dttm"], how="inner")
     # Joins do not preserve row order; sort so row_ix indexing lines up with df.

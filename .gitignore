@@ -1,8 +1,9 @@
-reference/
-work/
+/reference/
+/work/
+/gemflair/work/
+/gemflair/output/
+/gemflair/.venv/
 .DS_Store
 __pycache__/
 *.pyc
-.venv/
-output/
-GEM-weights-FL-manuscript/
+/GEM-weights-FL-manuscript/

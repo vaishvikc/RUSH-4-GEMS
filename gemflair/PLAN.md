@@ -37,7 +37,9 @@ config/gemflair.yaml            ← the one file a user edits
 ```
 
 Stages 0–3 are task-independent and run once. Stage 4 is the only new algorithm.
-Stage 5 is the only GPU stage.
+Stage 5 is the only GPU stage. The RUSH/FedAvg10 configuration splits inference
+into two contiguous parts on GPUs 0 and 1, then validates and merges them in
+`cut_index` row order.
 
 ## 2. Run order
 
@@ -72,9 +74,11 @@ representation without raising an error:
 ```
 
 `verify-rope` computes mean next-token cross-entropy on the `tuning` split under both
-schemes and compares them to the eval loss recorded in the published
-`trainer_state.json`, **2.256498098373413**. It writes `work/audit/verify_rope.json`
-with `target`, `with_rope`, `without_rope`, and `selected`.
+schemes. When the checkpoint includes a `trainer_state.json`, it also reports the
+published eval loss as `target`; federated checkpoints without trainer state report
+`target: null` and select the lower measured loss. It writes
+`work/audit/verify_rope.json` with `target`, `with_rope`, `without_rope`, and
+`selected`.
 
 Read the result:
 
@@ -185,17 +189,12 @@ But it means those 23 tokens are effectively unused, and **nothing in the pipeli
 flags it**. If a future `clifpy` gains a time-resolved SOFA, the derived table gains
 real event times and those tokens start contributing.
 
-### 5.3 `clif_sofa` fails all-or-nothing on a dataset with active admissions
+### 5.3 Active admissions are excluded from terminal SOFA
 
-`event_time` comes from `discharge_dttm`, which is **null for a still-admitted
-encounter**, and `prep.check` rejects null time values. MIMIC has zero nulls across
-546,028 hospitalizations, so this is not currently triggered — but a site with live
-patients will hit a hard stop at stage 0.
-
-That is deliberate. Silently dropping those rows is exactly the failure mode this
-project exists to prevent. The operator must decide the policy explicitly: filter
-still-admitted encounters out of the cohort, or impute a censoring time, or accept a
-modified `prep` that excludes them from `clif_sofa` only. There is no default.
+`event_time` comes from `discharge_dttm`, which is null for a still-admitted
+encounter. `prep` excludes those encounters from `clif_sofa` only; their raw CLIF
+events remain available to the rest of the pipeline. This avoids inventing a
+terminal SOFA timestamp while keeping all completed encounters strict.
 
 ### 5.4 The `time_based_rope` setting is not published with the weights
 

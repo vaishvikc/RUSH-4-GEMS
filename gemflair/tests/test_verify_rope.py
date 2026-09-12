@@ -5,6 +5,13 @@ import torch
 from gemflair import verify_rope
 
 
+def test_training_target_is_optional(tmp_path):
+    assert verify_rope.training_target({"trainer_state": None}) is None
+    state = tmp_path / "trainer_state.json"
+    state.write_text('{"best_metric": 1.25}')
+    assert verify_rope.training_target({"trainer_state": state}) == 1.25
+
+
 def test_blocks_pack_contiguously_and_drop_the_remainder():
     out = verify_rope.blocks([[1, 2, 3], [4, 5, 6, 7]], seq_len=3)
     assert out.tolist() == [[1, 2, 3], [4, 5, 6]]

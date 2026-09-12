@@ -32,6 +32,14 @@ def test_no_leakage_passes_on_a_correct_cut():
     assert _ok(res, "no_future_data")
 
 
+def test_no_leakage_accepts_timezone_aware_token_times():
+    tokens = TOKENS.with_columns(pl.col("times").list.eval(
+        pl.element().dt.replace_time_zone("US/Central")))
+    frame = winnow.cut(tokens, winnow.cut_points([COHORT]), max_len=10)
+    res = audit.after_winnow(frame, tokens, {"t": COHORT}, max_len=10)
+    assert _ok(res, "no_future_data")
+
+
 def test_no_leakage_fails_when_a_cutoff_is_moved_backwards():
     frame = winnow.cut(TOKENS, winnow.cut_points([COHORT]), max_len=10)
     tampered = frame.with_columns(
@@ -53,6 +61,14 @@ def test_removed_rows_are_reported_with_prediction_ids():
     res = audit.after_winnow(frame, TOKENS, {"t": cohort}, max_len=10)
     removed = next(r for r in res if r["check"] == "rows_removed")
     assert "p1" in removed["detail"]
+
+
+def test_removed_rows_accepts_different_datetime_precision():
+    cohort = COHORT.with_columns(
+        pl.col("feature_cutoff_dttm").dt.cast_time_unit("ns"))
+    frame = winnow.cut(TOKENS, winnow.cut_points([cohort]), max_len=10)
+    res = audit.after_winnow(frame, TOKENS, {"t": cohort}, max_len=10)
+    assert _ok(res, "rows_removed")
 
 
 def test_duplicate_cut_points_are_caught():

@@ -7,8 +7,10 @@ INDEX_COLS = ["row_ix", "subject_id", "feature_cutoff_dttm", "n_past", "n_kept"]
 
 
 def cut_points(cohorts):
-    return (pl.concat([c.select(subject_id="hospitalization_id",
-                                feature_cutoff_dttm="feature_cutoff_dttm")
+    return (pl.concat([c.select(
+                            subject_id="hospitalization_id",
+                            feature_cutoff_dttm=pl.col("feature_cutoff_dttm")
+                            .dt.cast_time_unit("us"))
                        for c in cohorts])
             .unique()
             .sort("subject_id", "feature_cutoff_dttm"))
@@ -18,8 +20,21 @@ def count_past(tokens_times, cuts):
     # join_asof finds the last event at or before the cutoff; its index + 1 is the count.
     events = (tokens_times.select("subject_id", "times").explode("times")
               .with_columns(ix=pl.int_range(pl.len()).over("subject_id")))
-    return (cuts.sort("feature_cutoff_dttm")
-            .join_asof(events.sort("times"), left_on="feature_cutoff_dttm",
+    time_dtype = events.schema["times"]
+    cutoff_dtype = cuts.schema["feature_cutoff_dttm"]
+    cutoff = pl.col("feature_cutoff_dttm")
+    if time_dtype.time_zone and not cutoff_dtype.time_zone:
+        localized = cutoff.dt.replace_time_zone(
+            time_dtype.time_zone, ambiguous="latest", non_existent="null")
+        shifted = (cutoff + pl.duration(hours=1)).dt.replace_time_zone(
+            time_dtype.time_zone, ambiguous="latest", non_existent="null")
+        cutoff = pl.coalesce(localized, shifted)
+    elif time_dtype.time_zone:
+        cutoff = cutoff.dt.convert_time_zone(time_dtype.time_zone)
+    cutoff = cutoff.dt.cast_time_unit(time_dtype.time_unit)
+    keyed = cuts.with_columns(cutoff.alias("_cutoff_key"))
+    return (keyed.sort("_cutoff_key")
+            .join_asof(events.sort("times"), left_on="_cutoff_key",
                        right_on="times", by="subject_id", strategy="backward")
             .with_columns(n_past=(pl.col("ix") + 1).fill_null(0))
             .select("subject_id", "feature_cutoff_dttm", "n_past"))

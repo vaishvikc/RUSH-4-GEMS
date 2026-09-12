@@ -35,9 +35,14 @@ def startup(cfg):
 
 def after_winnow(frame, tokens_times, cohorts, max_len):
     # Bound n_past from both sides: last included <= cutoff, first excluded > cutoff.
+    time_dtype = tokens_times.schema["times"].inner
+    last = pl.col("times").list.head("n_past").list.last()
+    nxt = pl.col("times").list.slice(pl.col("n_past"), 1).list.first()
+    if time_dtype.time_zone:
+        last = last.dt.replace_time_zone(None)
+        nxt = nxt.dt.replace_time_zone(None)
     check = (frame.join(tokens_times.select("subject_id", "times"), on="subject_id")
-             .with_columns(last=pl.col("times").list.head("n_past").list.last(),
-                           nxt=pl.col("times").list.slice(pl.col("n_past"), 1).list.first()))
+             .with_columns(last=last, nxt=nxt))
     leaks = check.filter(pl.col("last") > pl.col("feature_cutoff_dttm")).height
     undercount = check.filter(pl.col("nxt") <= pl.col("feature_cutoff_dttm")).height
 
@@ -46,10 +51,14 @@ def after_winnow(frame, tokens_times, cohorts, max_len):
         | (pl.col("tokens_past").list.len() > max_len))["bad"].sum()
 
     kept = frame.select("subject_id", "feature_cutoff_dttm").unique()
+    cutoff_unit = kept.schema["feature_cutoff_dttm"].time_unit
     removed = []
     for cohort in cohorts.values():
-        missing = cohort.join(kept, left_on=["hospitalization_id", "feature_cutoff_dttm"],
-                              right_on=["subject_id", "feature_cutoff_dttm"], how="anti")
+        normalized = cohort.with_columns(
+            pl.col("feature_cutoff_dttm").dt.cast_time_unit(cutoff_unit))
+        missing = normalized.join(
+            kept, left_on=["hospitalization_id", "feature_cutoff_dttm"],
+            right_on=["subject_id", "feature_cutoff_dttm"], how="anti")
         removed += missing["prediction_id"].to_list()
 
     dupes = frame.height - kept.height

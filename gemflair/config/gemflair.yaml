@@ -1,17 +1,16 @@
 # Relative paths resolve against the current working directory.
 data:
-  clif_dir: /Users/sudo_sage/Downloads/work/clif_m
-  derived_dir: ./work/clif_derived
-  timezone: US/Eastern
-  site: mimic
+  clif_dir: /home/vchaudha/RUSH_CLIF
+  derived_dir: /home/vchaudha/RUSH-4-GEMS/work/fedavg10-rush/clif_derived
+  timezone: US/Central
+  site: rush
 
 model:
-  dir: ../GEM-weights-FL-manuscript/GEM-mimic-icu/mdl-cotorra
+  dir: ../GEM-weights-FL-manuscript/FedAvg10/coreopsis-round-10
   tokenizer: ../GEM-weights-FL-manuscript/tokenizer.yaml
-  trainer_state: ../GEM-weights-FL-manuscript/GEM_-mimic-icu/mdl-cotorra/trainer_state.json
+  trainer_state: null
   max_len: 4096
-  time_based_rope:
-    sec_per_pos_id: 300
+  time_based_rope: null
 
 tasks:
   - icu_daily_mortality
@@ -25,6 +24,7 @@ split:
 
 extract:
   batch_size: 64
+  devices: [0, 1]
 
 xgboost:
   early_stopping_rounds: 50
@@ -33,4 +33,4 @@ xgboost:
 limits:
   max_encounters_per_task: null
 
-work_dir: ./work
+work_dir: /home/vchaudha/RUSH-4-GEMS/work/fedavg10-rush

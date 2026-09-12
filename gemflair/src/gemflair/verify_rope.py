@@ -8,6 +8,19 @@ from transformers import AutoModelForCausalLM
 from gemflair import config
 
 
+def disable_native_triton():
+    try:
+        from torch._native import triton_utils
+    except ImportError:
+        return
+    triton_utils.deregister_op_overrides()
+
+
+def training_target(model_cfg):
+    state = model_cfg.get("trainer_state")
+    return json.loads(state.read_text())["best_metric"] if state else None
+
+
 def blocks(rows, seq_len):
     flat = [x for row in rows for x in row]
     n = len(flat) // seq_len
@@ -32,9 +45,11 @@ def eval_loss(model, tok_blocks, elapsed_blocks, sec_per_pos_id, device, batch_s
 
 def run(cfg, n_blocks=64):
     p = config.paths(cfg)
-    target = json.loads(cfg["model"]["trainer_state"].read_text())["best_metric"]
+    target = training_target(cfg["model"])
     device = "cuda" if torch.cuda.is_available() else (
         "mps" if torch.backends.mps.is_available() else "cpu")
+    if device == "cuda":
+        disable_native_triton()
     model = AutoModelForCausalLM.from_pretrained(cfg["model"]["dir"]).to(device).eval()
 
     splits = pl.read_parquet(p["processed"] / "subject_splits.parquet")

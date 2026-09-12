@@ -41,6 +41,14 @@ def test_attach_returns_float32():
     assert X.dtype == np.float32
 
 
+def test_attach_accepts_different_datetime_precision():
+    cohort = COHORT.with_columns(
+        pl.col("feature_cutoff_dttm").dt.cast_time_unit("ns"))
+    df, X = fit.attach(cohort, INDEX, FEATURES)
+    assert df.height == 3
+    assert X.shape == (3, 2)
+
+
 def test_val_mask_holds_out_whole_encounters():
     df = pl.DataFrame({"hospitalization_join_id": ["e1", "e1", "e2", "e3"]})
     train = np.array([True, True, True, True])

@@ -52,6 +52,15 @@ def test_cutoff_before_first_event_is_dropped(tokens_times):
     assert out.height == 0
 
 
+def test_naive_cutoff_compares_with_timezone_aware_events(tokens_times):
+    aware = tokens_times.with_columns(
+        pl.col("times").list.eval(
+            pl.element().dt.replace_time_zone("US/Central")))
+    out = winnow.cut(aware, _cuts([("a", 2)]), max_len=10)
+    assert out["tokens_past"].to_list() == [[10, 11]]
+    assert out.schema["feature_cutoff_dttm"].time_zone is None
+
+
 def test_one_subject_many_cutpoints_are_nested(tokens_times):
     out = winnow.cut(tokens_times, _cuts([("a", 2), ("a", 3), ("a", 4)]), max_len=10)
     assert out.height == 3
@@ -77,6 +86,16 @@ def test_cut_points_deduplicate_across_tasks():
                         "feature_cutoff_dttm": [AT(2), AT(5)]})
     out = winnow.cut_points([one, two])
     assert out.height == 3
+
+
+def test_cut_points_normalizes_datetime_precision():
+    one = pl.DataFrame({"hospitalization_id": ["a"],
+                        "feature_cutoff_dttm": [AT(2)]}).with_columns(
+                            pl.col("feature_cutoff_dttm").dt.cast_time_unit("ns"))
+    two = pl.DataFrame({"hospitalization_id": ["b"],
+                        "feature_cutoff_dttm": [AT(3)]})
+    out = winnow.cut_points([one, two])
+    assert out.schema["feature_cutoff_dttm"] == pl.Datetime("us")
 
 
 def test_write_keeps_both_files_in_the_same_order(tokens_times, tmp_path):

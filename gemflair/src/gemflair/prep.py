@@ -175,7 +175,8 @@ def build(cfg, force=False):
     out_dir.mkdir(parents=True, exist_ok=True)
     co = clifpy.ClifOrchestrator(
         data_directory=str(cfg["data"]["clif_dir"]),
-        filetype="parquet", timezone=cfg["data"]["timezone"])
+        filetype="parquet", timezone=cfg["data"]["timezone"],
+        output_directory=str(cfg.get("work_dir", out_dir) / "clifpy_output"))
     written = []
     for name in TABLES:
         path = out_dir / f"{name}.parquet"
@@ -206,7 +207,8 @@ def _build_one(co, name):
         stays = pl.from_pandas(co.load_table("hospitalization").df).select(
             pl.col("hospitalization_id").cast(pl.Utf8),
             pl.col("admission_dttm").alias("start_dttm"),
-            pl.col("discharge_dttm").alias("end_dttm"))
+            pl.col("discharge_dttm").alias("end_dttm")).filter(
+                pl.col("end_dttm").is_not_null())
         scores = clifpy.compute_sofa_polars(
             co.data_directory, stays, filetype=co.filetype, timezone=co.timezone)
         return scores.join(

@@ -1,4 +1,6 @@
 import pathlib
+from datetime import datetime
+from types import SimpleNamespace
 
 import clifpy
 import polars as pl
@@ -45,6 +47,26 @@ def test_check_rejects_nulls_in_the_time_column():
     frame = pl.DataFrame({c: [None] if c == time_col else [0] for c in [time_col] + cols})
     with pytest.raises(RuntimeError, match="RESP"):
         prep.check(frame, "clif_respiratory_support_processed")
+
+
+def test_sofa_excludes_active_admissions(monkeypatch):
+    hospitalizations = pl.DataFrame({
+        "hospitalization_id": ["complete", "active"],
+        "admission_dttm": [datetime(2025, 1, 1), datetime(2026, 1, 1)],
+        "discharge_dttm": [datetime(2025, 1, 2), None],
+    }).to_pandas()
+    co = SimpleNamespace(
+        data_directory="/data", filetype="parquet", timezone="US/Central",
+        load_table=lambda name: SimpleNamespace(df=hospitalizations))
+
+    def compute_sofa(data_directory, stays, **kwargs):
+        assert stays["hospitalization_id"].to_list() == ["complete"]
+        return pl.DataFrame({"hospitalization_id": ["complete"]})
+
+    monkeypatch.setattr(clifpy, "compute_sofa_polars", compute_sofa)
+    result = prep._build_one(co, "clif_sofa")
+    assert result["hospitalization_id"].to_list() == ["complete"]
+    assert result["event_time"].null_count() == 0
 
 
 def test_build_on_clifpy_demo_data_matches_the_collation_columns(tmp_path):

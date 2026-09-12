@@ -30,6 +30,16 @@ def test_raw_view_lets_derived_shadow_raw(tmp_path):
     assert (view / "clif_sofa.parquet").resolve() == (derived / "clif_sofa.parquet")
 
 
+def test_collator_shifts_nonexistent_dst_time_forward():
+    collator = object.__new__(run._DstSafeCollator)
+    collator.tz = "US/Central"
+    frame = pl.LazyFrame({"time": [dt.datetime(2018, 3, 11, 1),
+                                    dt.datetime(2018, 3, 11, 2)]})
+    result = frame.select(collator.to_default_tz(frame, "time")).collect()["time"]
+    assert [value.hour for value in result] == [1, 3]
+    assert str(result.dtype.time_zone) == "US/Central"
+
+
 def _cohort():
     return pl.DataFrame({
         "hospitalization_join_id": ["e1", "e1", "e2", "e3", "e4"],
@@ -98,3 +108,30 @@ def test_load_task_reapplies_the_cap_to_a_cached_cohort_without_the_subprocess(
     result = pl.read_parquet(out)
     assert result["hospitalization_join_id"].n_unique() == 2
     assert set(result["split"].unique()) == {"train", "test"}
+
+
+def test_shard_bounds_cover_odd_size_contiguously():
+    assert run.shard_bounds(5, 2, 0) == (0, 3)
+    assert run.shard_bounds(5, 2, 1) == (3, 5)
+
+
+def test_merge_feature_parts_preserves_row_order(tmp_path):
+    first = tmp_path / "first.parquet"
+    second = tmp_path / "second.parquet"
+    final = tmp_path / "features.parquet"
+    pl.DataFrame({"_row_ix": [0, 1, 2],
+                  "features": [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]]}).write_parquet(first)
+    pl.DataFrame({"_row_ix": [3, 4],
+                  "features": [[3.0, 3.0], [4.0, 4.0]]}).write_parquet(second)
+    run.merge_feature_parts([second, first], final, total=5, feature_size=2)
+    assert pl.read_parquet(final)["features"].to_list() == [
+        [0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0]]
+
+
+def test_merge_feature_parts_rejects_missing_rows(tmp_path):
+    part = tmp_path / "part.parquet"
+    pl.DataFrame({"_row_ix": [0, 2],
+                  "features": [[0.0, 0.0], [2.0, 2.0]]}).write_parquet(part)
+    with pytest.raises(RuntimeError, match="exactly once"):
+        run.merge_feature_parts([part], tmp_path / "features.parquet",
+                                total=3, feature_size=2)

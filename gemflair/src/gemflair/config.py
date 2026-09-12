@@ -13,14 +13,16 @@ def load(path="config/gemflair.yaml"):
         d = cfg
         for k in keys[:-1]:
             d = d[k]
-        d[keys[-1]] = pathlib.Path(d[keys[-1]]).expanduser().resolve()
+        if d.get(keys[-1]) is not None:
+            d[keys[-1]] = pathlib.Path(d[keys[-1]]).expanduser().resolve()
     return cfg
 
 
 def paths(cfg):
     w = cfg["work_dir"]
     names = ["raw_view", "processed", "cohorts", "preds", "reports", "audit",
-             "generated", "flair_cache"]
+              "generated", "flair_cache", "cache", "logs", "tmp",
+              "extract_parts", "clifpy_output"]
     return {n: w / n for n in names}
 
 
