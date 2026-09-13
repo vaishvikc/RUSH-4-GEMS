@@ -15,3 +15,6 @@ The RUSH/FedAvg10 configuration writes all generated artifacts beneath
 `uv run gemflair --help` lists the stages; each can be run alone. Run
 `uv run gemflair verify-rope` after `winnow` and **before** `extract` — see `PLAN.md`,
 which carries the run order, the HPC runbook, and the known limitations.
+
+See [`TOKEN_STREAM.md`](TOKEN_STREAM.md) for the EHR-to-CDS architecture, token flow,
+run decisions, workarounds, and results from the full RUSH/FedAvg10 evaluation.
