@@ -7,3 +7,25 @@
 __pycache__/
 *.pyc
 /GEM-weights-FL-manuscript/
+
+# Keep clinical data and generated artifacts out of version control.
+**/raw/
+**/processed/
+**/cohorts/
+**/preds/
+**/reports/
+**/audit/
+**/logs/
+**/cache/
+*.csv
+*.tsv
+*.parquet
+*.arrow
+*.feather
+*.jsonl
+*.sqlite
+*.db
+*.pkl
+*.pickle
+*.npy
+*.npz

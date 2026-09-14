@@ -1,7 +1,7 @@
 # Relative paths resolve against the current working directory.
 data:
-  clif_dir: /home/vchaudha/RUSH_CLIF
-  derived_dir: /home/vchaudha/RUSH-4-GEMS/work/fedavg10-rush/clif_derived
+  clif_dir: /path/to/RUSH_CLIF
+  derived_dir: ./work/fedavg10-rush/clif_derived
   timezone: US/Central
   site: rush
 
@@ -33,4 +33,4 @@ xgboost:
 limits:
   max_encounters_per_task: null
 
-work_dir: /home/vchaudha/RUSH-4-GEMS/work/fedavg10-rush
+work_dir: ./work/fedavg10-rush
