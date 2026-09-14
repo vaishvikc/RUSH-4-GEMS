@@ -8,7 +8,7 @@ runner = CliRunner()
 def test_every_stage_is_a_command():
     out = runner.invoke(cli.app, ["--help"])
     for name in ("prep", "cohorts", "tokenize", "verify-rope", "winnow",
-                 "extract", "fit", "report", "run"):
+                 "extract", "fit", "report", "plot-auroc", "run"):
         assert name in out.stdout
 
 

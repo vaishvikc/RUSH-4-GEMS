@@ -138,6 +138,17 @@ def report(config_path: str = CONFIG):
         run.build_report(cfg, task)
 
 
+@app.command("plot-auroc")
+def plot_auroc_cmd(config_path: str = CONFIG):
+    from gemflair import plotting
+
+    cfg = config.load(config_path)
+    reports = config.paths(cfg)["reports"]
+    output = plotting.save_auroc_figure(
+        reports, reports / "auroc_four_panel.png")
+    typer.echo(output)
+
+
 @app.command("run")
 def run_all(config_path: str = CONFIG):
     for stage in STAGES:
